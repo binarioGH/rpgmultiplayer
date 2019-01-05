@@ -71,6 +71,9 @@ class Server:
 				system(clear)
 			elif c[:17] == "set costume clear":
 				costum_clear = c[18:]
+			elif c[:3] == "all":
+				for client in self.conns:
+					self.send(c[4:], client)
 		self.sock.shutdown(SHUT_RD)
 		self.sock.close()
 
@@ -98,42 +101,46 @@ class Server:
 				except:
 					pass
 	def process(self, m, c, csend):
+		m = m.strip()
 		cc = str(csend)
 		cmd = self.f.decrypt(m)
 		cmd = cmd.decode()
-		if True:
-			if cmd[0] == "*":
-				print("{} : {}".format(c, cmd[1:]))
-			elif cmd == "status":
-				for value in self.clients[cc][1].status:
-					self.send("\n{} : {}".format(value, self.clients[cc][1].status[value]), csend)
+		try:
+			if cmd == "status":
+				for stat in self.clients[cc][1].status:
+					self.send("{} : {}".format(stat, self.clients[cc][1].status[stat]), csend)
+			elif cmd[0] == "*":
+				print("{}: {}".format(self.clients[cc][0], cmd[1:]))
 			elif cmd == "inventory":
-				self.send("Item      |       Quantity      |      Type",csend)
+				self.send("Item       |      Quantity      |      Type", csend)
 				for item in self.clients[cc][1].inventario:
-					self.send("{}      |       {}      |       {}".format(item, self.clients[cc][0],self.clients[cc][1][0]),csend)
-			elif cmd[:3] == "use" or cmd[:7] == "consume":
-				if cmd[0] == "u":
-					n = cmd[4:]
-				else:
-					n = cmd[8:]
-					if n in self.clients[cc][1].inventario:
-						if self.clients[cc][1].inventario[n][1][2]:
-							self.clients[cc][1].status[self.clients[cc][1].inventario[n][1][1]] += self.clients[cc][1].inventario[n][2]
-							self.clients[cc][1].inventario[cc][0] -= 1
+					self.send("{}      |      {}      |      {}".format(item, self.clients[cc][1].inventario[item][0], self.clients[cc][1].inventario[item][1][0]), csend)
+			elif cmd[:3] == "use":
+				if cmd[4:] in self.clients[cc][1].inventario:
+					if self.clients[cc][1].inventario[cmd[4:]][1][2]:
+						self.clients[cc][1].status[self.clients[cc][1].inventario[cmd[4:]][1][1]] += self.clients[cc][1].inventario[cmd[4:]][2]
+						if self.clients[cc][1].inventario[cmd[4:]][0] <= 0:
+							del self.clients[cc][1].inventario[cmd[4:]]
 						else:
-							self.send("**That is not a consumable item.", csend)
+							self.clients[cc][1].inventario[cmd[4:]][0] -= 1
 					else:
-						self.send("**Item not found.", csend)
-			else:
-				self.send("**Comand not found", csend)
-			self.send(">",csend)
-		'''except IndexError:
-			pass
+						self.send("**Not consumable item.", csend)
+				else:
+					self.send("**Item not found.", csend)
 		except Exception as e:
-			send(str(e), csend)'''
+			self.send(str(e), csend)
+		finally:
+			self.send(">", csend)
+
 	def send(self, m, c):
-		msj = self.f.encrypt(m.encode())
-		c.send("\n{}".format(msj.deocode()).encode())
+		try:
+			msj = self.f.encrypt(m.encode())
+			c.send("\n{}".format(msj.decode()).encode())
+		except:
+			print("\n**{} disconnected".format(self.clients[str(c)][0]))
+			del self.clients[str(c)]
+			self.conns.remove(c)
+
 
 
 if __name__ == '__main__':
