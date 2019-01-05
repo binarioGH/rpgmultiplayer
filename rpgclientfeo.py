@@ -7,21 +7,46 @@ from platform import python_version as pv
 from platform import platform as p
 from threading import Thread
 from os import system
+
 class Client:
 	def __init__(self, ip, port, key):
 		self.sock = socket(AF_INET, SOCK_STREAM)
 		self.sock.connect((ip, port))
 		self.f = fern(key)
+		self.avatar = ""
+		self.missions = {}
 	def write(self):
 		while True:
 			try:
 				msj = self.sock.recv(1024)
-				print(self.f.decrypt(msj).decode())
+				msj = self.f.decrypt(msj)
+				msj = msj.decode()
+				self.process(msj)
 			except Exception as e:
 				print(e)
 	def send(self, msj):
 		msj = self.f.encrypt(msj.encode())
 		self.sock.send(msj)
+	def process(self, cmd):
+		if cmd[:6] == "avatar":
+			self.avatar = cmd[7:]
+		elif cmd[:11] == "add mission":
+			print("**New mission.")
+			count = 12
+			o = len(self.missions)
+			for c in cmd[12:]:
+				if c == " ":
+					if len(self.missions) == 0:
+						self.missions[cmd[12:count]] = cmd[count + 1:]
+				else:
+					count += 1
+		else:
+			print(cmd)
+			
+
+
+	def combat(self):
+		pass
 
 if __name__ == '__main__':
 	opt = op("Usage: %prog [usage] [value]")
@@ -44,5 +69,8 @@ if __name__ == '__main__':
 		cmd = raw_input(">")
 		if cmd == clear:
 			system(clear)
+		elif cmd == "missions":
+			for mission in c.missions:
+				print("{} : {}".format(mission, c.missions[mission]))
 		else:
 			c.send(cmd)
