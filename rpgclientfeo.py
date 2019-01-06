@@ -40,6 +40,9 @@ class Client:
 						self.missions[cmd[12:count]] = cmd[count + 1:]
 				else:
 					count += 1
+		elif cmd == "**You are death.":
+			print(cmd)
+			exit()
 		else:
 			print(cmd)
 			

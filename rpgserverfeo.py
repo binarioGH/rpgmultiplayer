@@ -11,19 +11,20 @@ from time import sleep
 
 class Character:
 	def __init__(self):
+		self.isdeath = False
 		self.status = {"Health":10, "Strong": 2, "Money": 20, "Level": 0, "Hunger": 10, "Resistance": 30}
 		self.inventario = {"Health potion":[1,("Potion","Health",True),10]}
 		self.xppoints = 0
 		self.xp = 0
 		self.equipo = {"Head":[False,"0","0"],"Chest":[False,"|","|"],"Hands":[False,None,None],"Weapon":[False,"",""]}
-		self.avatar ='''\n 		 {}\n 		/{}\\{}\n 		/ \\'''.format(self.equipo["Head"][1],self.equipo["Chest"][1],self.equipo["Weapon"][1])
+		self.avatar ='''\n 		 {}\n 		/{}\\{}\n 		/ \\'''.format(self.equipo["Head"][1],self.equipo["Chest"][1],self.equipo["Weapon"][1])	
 		n = Thread(target=self.needs)
 		n.daemon = True
 		n.start()
 	def needs(self):
 		self.xtop = 10
 		count = 0
-		while True:
+		while self.status["Health"] >= 1:
 			sleep(1)
 			count += 1
 			if count == self.status["Resistance"]:
@@ -36,7 +37,7 @@ class Character:
 					self.xppoints += 10 * self.xtop
 				else:
 					self.xppoints += randint(int(self.xppoints / 4), int(self.xppoints / 2) )
-
+		self.isdeath = True
 class Server:
 	def __init__(self, host, port , lisent, key):
 		if str(pv())[0] == "3":
@@ -63,6 +64,9 @@ class Server:
 		h = Thread(target=self.heartoall)
 		h.daemon = True
 		h.start()
+		d = Thread(target=self.death)
+		d.daemon = True
+		d.start()
 		c = ""
 		costum_clear = clear
 		while c != "exit":
@@ -72,11 +76,24 @@ class Server:
 			elif c[:17] == "set costume clear":
 				costum_clear = c[18:]
 			elif c[:3] == "all":
-				for client in self.conns:
-					self.send(c[4:], client)
-		self.sock.shutdown(SHUT_RD)
-		self.sock.close()
+				self.sendtoall(c[4:])
 
+			elif c[:3] == "ban":
+				for c in self.clients:
+					if self.clients[c][0] == c[4:]:
+						banned = c
+				for c in self.conns:
+					if str(c) == banned:
+						c.shutdown(SHUT_WR)
+						c.close()
+
+		for client in self.conns:
+			client.shutdown(SHUT_WR)
+			client.close()
+		self.sock.close()
+	def sendtoall(self, msj):
+		for client in self.conns:
+			self.send(msj, client)
 	def wait(self):
 		count = 0
 		while True:
@@ -100,7 +117,7 @@ class Server:
 					self.process(msj,self.clients[str(c)][0], c)
 				except:
 					pass
-	def process(self, m, c, csend):
+	def process(self, m, c, csend): 	
 		m = m.strip()
 		cc = str(csend)
 		cmd = self.f.decrypt(m)
@@ -140,6 +157,30 @@ class Server:
 			print("\n**{} disconnected".format(self.clients[str(c)][0]))
 			del self.clients[str(c)]
 			self.conns.remove(c)
+	def death(self):
+		count = 0
+		while True:
+			try:
+				for c in self.clients:
+					if self.clients[c][1].isdeath:
+						for cl in self.conns:
+							if str(cl) == c:
+								self.send("**You are death.",cl)
+								self.conns[cl].shutdown(SHUT_RD)
+								self.conns[cl].close()
+								self.conns.remove(cl)
+						del self.clients[c]
+				if count < 0:
+					count = 1
+				else:
+					count -= 1
+			except Exception as e:
+				if count == 3:
+					print(e)
+				else:
+					count += 1
+
+
 
 
 
